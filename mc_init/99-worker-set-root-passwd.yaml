@@ -1,0 +1,30 @@
+# root:growin
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-set-root-passwd
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,JDYkc0RJa1F5SDZVV0I2eGYwSiRtb0s0QnNXbS9hem9xeVNxL0tiVk9sbHBraDJELnpza1lSRzVsWUFUTDl1UFBLdy9BZWFGM29hOUQ2cnhmNWFZVUZyOHZqeUhJbnFuc3pvTzQ5cWlyMQo=
+        mode: 420
+        overwrite: true
+        path: /etc/root.passwd
+    systemd:
+      units:
+      - name: set-root-passwd.service
+        enabled: true
+        contents: |
+          [Unit]
+          Description=Set 'root' user password for out-of-band login
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'chpasswd -e < /etc/root.passwd'
+          [Install]
+          WantedBy=multi-user.target
