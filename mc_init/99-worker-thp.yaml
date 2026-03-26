@@ -1,0 +1,12 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-isolcpu
+spec:
+  kernelArguments:
+    - isolcpus=4-7
+    - hugepagesz=1G
+    - hugepages=2
+    - transparent_hugepage=never

@@ -1,0 +1,26 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-master-add-iscsiadm
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Custom Iscsi Add
+          After=iscsid.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=iscsiadm -m node -l
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: custom-add-iscsi.service
