@@ -1,1 +1,109 @@
-# 
+# ocp-tools
+
+OpenShift 운영 작업에 사용하는 스크립트 모음입니다.
+
+현재 레포에는 클러스터 리소스 백업 스크립트와 이미지 미러링 스크립트가 포함되어 있습니다.
+
+## Repository Structure
+
+```text
+ocp-tools/
+├── README.md
+├── backup/
+│   ├── growin_ocp_backup.sh
+│   └── growin_ocp_backup_v0.2.sh
+└── image/
+    └── mirror-images.sh
+```
+
+## Scripts
+
+### 1) backup/growin_ocp_backup.sh
+
+기존 OpenShift 정보 백업 스크립트입니다.
+
+Primary Function:
+
+- 클러스터 전반 리소스 목록 수집
+- Pod, Service, StatefulSet, Deployment, DeploymentConfig, DaemonSet 개별 YAML 백업
+- PV, PVC, Node, CO, MC, MCP, VM, SC, KubeletConfig, NAD, CSV, ConfigMap 수집
+- `oc get ... -o wide` 스냅샷 파일 생성
+- 마스터 노드에 SSH 접속하여 `cluster-backup.sh` 실행
+
+Features:
+
+- 순차 처리 방식
+- 리소스별 반복 `oc get` 호출
+- PVC는 `describe` 결과로 저장
+- CSV는 이름 기준 중복 제거 후 저장
+
+How to Use:
+
+```bash
+bash backup/growin_ocp_backup.sh
+```
+
+### 2) backup/growin_ocp_backup_v0.2.sh
+
+병렬 처리 기반으로 개선된 백업 스크립트입니다.
+
+Primary Function:
+
+- Namespace 단위 병렬 백업
+- 리소스 JSON 수집 후 개별 파일 저장
+- CSV 이름 기준 dedup
+- cluster-scope 리소스 JSON 백업
+- warn / err 로그 분리
+
+Features:
+
+- 병렬 처리 (기본 12)
+- API 호출 최소화
+- jq / flock 사용
+- optional resource 자동 판단
+
+How to Use:
+
+```bash
+bash backup/growin_ocp_backup_v0.2.sh
+```
+
+```bash
+PARALLEL_NS=20 bash backup/growin_ocp_backup_v0.2.sh
+```
+
+### 3) image/mirror-images.sh
+
+이미지 목록을 읽어 대상 레지스트리로 병렬 미러링하는 스크립트입니다.
+
+Primary Function:
+
+- 이미지 추출 및 중복 제거
+- 레지스트리 자동 로그인
+- 존재 시 skip
+- skopeo 기반 복사
+
+Features:
+
+- 병렬 처리
+- retry 지원
+- success / fail 로그 분리
+
+How to Use:
+
+```bash
+bash image/mirror-images.sh images.txt bastion.ocp.lsh:5000 6 2 ./mirror-logs
+```
+
+## Requirements
+
+backup:
+
+- oc
+- jq
+- flock
+
+image:
+
+- podman
+- skopeo
