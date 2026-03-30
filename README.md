@@ -1,15 +1,22 @@
 # ocp-tools
 
-OpenShift/OKD 구축 및 운영 자동화를 위한 스크립트 모음입니다.
+OpenShift / OKD cluster bootstrap automation toolkit.
 
-현재 레포 기준으로 주요 영역은 다음과 같습니다.
+This repository provides a stage-based installation pipeline for bare-metal or UPI-style environments using PXE, local registry, and bastion-based control.
 
-- `backup/` : 클러스터 리소스 백업
-- `image/` : 이미지 수집/미러링
-- `mc_init/` : 초기 MachineConfig 리소스
-- `install/01-pre/` : 배스천/사전 준비 작업
-- `install/02-okd-install/` : OKD 설치용 배스천 구성 및 설치 스크립트
-- `install/03-post/` : 설치 후 공통 후처리 작업
+---
+
+## Overview
+
+The installation flow is divided into 3 explicit stages:
+
+```text
+pre     → bastion / infra setup
+install → cluster creation
+post    → cluster configuration
+```
+
+Each stage is executed independently via `install/run.sh`.
 
 ---
 
@@ -23,384 +30,304 @@ ocp-tools/
 │   └── growin_ocp_backup_v0.2.sh
 ├── image/
 │   └── mirror-images.sh
-├── mc_init/
-│   ├── 99-master-*.yaml
-│   ├── 99-worker-*.yaml
-│   └── make-registry-mc.sh
-└── install/
-    ├── 01-pre/
-    │   ├── 00-make-certs.sh
-    │   ├── 01-registry.sh
-    │   ├── 02-openshift-admin-user.sh
-    │   ├── 03-bastion-account.sh
-    │   ├── 04-command-extract.sh
-    │   └── 05-bastion-chrony.sh
-    ├── 02-okd-install/
-    │   └── script.sh
-    └── 03-post/
-        ├── 06-ingress-master.sh
-        ├── 07-whereabouts-reconciler.sh
-        ├── 08-userWorkloadMonitoring.sh
-        ├── 09-routingViaHost.sh
-        └── 10-enableCatalogSources.sh
+├── install/
+│   ├── 00-inventory/
+│   │   └── hosts.txt
+│   ├── 00-vars/
+│   │   ├── bastion.env
+│   │   ├── cluster.env
+│   │   ├── install-config.env
+│   │   ├── network.env
+│   │   ├── post.env
+│   │   └── registry.env
+│   ├── 01-pre/
+│   │   ├── 00-command-extract.sh
+│   │   ├── 01-disable-selinux.sh
+│   │   ├── 02-bastion-account.sh
+│   │   ├── 03-bastion-chrony.sh
+│   │   ├── 04-make-certs.sh
+│   │   ├── 05-registry.sh
+│   │   ├── 06-hosts-render.sh
+│   │   ├── 07-dns-render.sh
+│   │   ├── 08-haproxy-render.sh
+│   │   ├── 09-tftp-install.sh
+│   │   ├── 10-dhcp-render.sh
+│   │   ├── 11-pxe-grub-render.sh
+│   │   └── 12-keepalived-render.sh
+│   ├── 02-install/
+│   │   ├── 00-install-config-render.sh
+│   │   ├── 01-manifests-generate.sh
+│   │   ├── 02-ignition-generate.sh
+│   │   ├── 03-publish-artifacts.sh
+│   │   └── 04-create-cluster.sh
+│   ├── 03-post/
+│   │   ├── 00-openshift-admin-user.sh
+│   │   ├── 01-ingress-master.sh
+│   │   ├── 02-whereabouts-reconciler.sh
+│   │   ├── 03-userWorkloadMonitoring.sh
+│   │   ├── 04-routingViaHost.sh
+│   │   └── 05-enableCatalogSources.sh
+│   ├── lib/
+│   │   └── common.sh
+│   ├── templates/
+│   │   ├── dhcpd.conf.tmpl
+│   │   ├── haproxy.cfg.tmpl
+│   │   ├── install-config.yaml.tmpl
+│   │   ├── keepalived.conf.tmpl
+│   │   ├── named.conf.tmpl
+│   │   └── zone.forward.tmpl
+│   └── run.sh
+└── mc_init/
 ```
 
 ---
 
-## 1. backup
+## Stage Execution
 
-클러스터 리소스 백업 스크립트입니다.
-
-### Included scripts
-
-#### `backup/growin_ocp_backup.sh`
-기본 백업 스크립트입니다.
-
-#### `backup/growin_ocp_backup_v0.2.sh`
-병렬 처리 기반 개선 버전입니다.
-
-### Main purpose
-
-- namespace별 주요 리소스 수집
-- cluster 범위 리소스 수집
-- YAML/JSON 기반 백업
-- 운영 점검 및 장애 분석용 스냅샷 확보
-
-### Typical use
+### PRE
 
 ```bash
-bash backup/growin_ocp_backup.sh
+cd install
+bash run.sh pre
 ```
 
+What it does:
+
+- Extract required commands
+- Disable SELinux
+- Configure bastion account
+- Configure chrony
+- Generate certificates
+- Start local registry
+- Configure `/etc/hosts`
+- Configure DNS
+- Configure HAProxy
+- Configure TFTP
+- Configure DHCP
+- Generate PXE / GRUB configs
+- Configure keepalived
+
+### INSTALL
+
 ```bash
-bash backup/growin_ocp_backup_v0.2.sh
+cd install
+bash run.sh install
 ```
+
+What it does:
+
+- Render `install-config.yaml`
+- Generate manifests
+- Generate ignition configs
+- Publish FCOS artifacts and ignition files
+- Run cluster creation / bootstrap wait flow
+
+### POST
+
+```bash
+cd install
+bash run.sh post
+```
+
+What it does:
+
+- Create OpenShift admin user
+- Configure ingress scheduling
+- Enable whereabouts reconciler
+- Enable user workload monitoring
+- Apply routingViaHost
+- Enable catalog sources
 
 ---
 
-## 2. image
+## Inventory Format
 
-이미지 미러링 스크립트입니다.
+`install/00-inventory/hosts.txt`
 
-### `image/mirror-images.sh`
-
-주요 기능:
-
-- 입력 이미지 목록에서 대상 이미지 추출
-- 중복 제거
-- 필요한 레지스트리 자동 로그인
-- 대상 레지스트리에 이미 존재하는 이미지 skip
-- `skopeo copy --all` 기반 복사
-- 병렬 처리
-- retry 지원
-- success / fail 로그 분리
-
-### Typical use
-
-```bash
-bash image/mirror-images.sh images.txt bastion.ocp.lsh:5000 6 2 ./mirror-logs
+```text
+hostname role ip gateway nic mac nettype vlan_id install_dev
 ```
 
-인자 의미 예시:
+Example:
 
-- `images.txt` : 원본 이미지 목록 파일
-- `bastion.ocp.lsh:5000` : 대상 레지스트리
-- `6` : 병렬 작업 수
-- `2` : 재시도 횟수
-- `./mirror-logs` : 로그 디렉토리
+```text
+bastion1 bastion 192.168.200.10 192.168.200.1 ens3 52:54:00:aa:bb:01 ethernet - /dev/vda
+bastion2 bastion 192.168.200.11 192.168.200.1 ens3 52:54:00:aa:bb:02 ethernet - /dev/vda
+bootstrap bootstrap 192.168.200.41 192.168.200.1 ens3 52:54:00:aa:bb:41 ethernet - /dev/vda
+master1 master 192.168.200.21 192.168.200.1 ens3 52:54:00:aa:bb:21 vlan 300 /dev/vda
+worker1 worker 192.168.200.31 192.168.200.1 ens3,ens4 52:54:00:aa:bb:31 bond - /dev/sda
+```
+
+Notes:
+
+- `nettype` supports `ethernet`, `vlan`, `bond`
+- worker bond interface is rendered as `bond0`
+- bootstrap/master default install device is `/dev/vda`
+- worker default install device is `/dev/sda`
 
 ---
 
-## 3. mc_init
+## Environment Variables
 
-OpenShift 노드 초기 설정용 MachineConfig 리소스와 생성 스크립트입니다.
+Configuration files are stored under:
 
-### Main purpose
-
-- master / worker 공통 초기 설정 반영
-- chrony 설정 배포
-- multipath 설정 배포
-- iSCSI 관련 설정 반영
-- core / root 계정 비밀번호 설정
-- SSH password login 허용
-- timezone 설정
-- worker 노드 kernel argument 설정
-- registry mirror용 MachineConfig 생성
-
-### Included files
-
-#### master
-- `99-master-chrony.yaml`
-- `99-master-iscsi-scan-add.yaml`
-- `99-master-multipath.yaml`
-- `99-master-registries.yaml`
-- `99-master-set-core-passwd.yaml`
-- `99-master-set-root-passwd.yaml`
-- `99-master-ssh-enable-password-login.yaml`
-- `99-master-timezone.yaml`
-
-#### worker
-- `99-worker-chrony.yaml`
-- `99-worker-iommu.yaml`
-- `99-worker-iscsi-scan-add.yaml`
-- `99-worker-multipath.yaml`
-- `99-worker-registries.yaml`
-- `99-worker-set-core-passwd.yaml`
-- `99-worker-set-root-passwd.yaml`
-- `99-worker-ssh-enable-password-login.yaml`
-- `99-worker-thp.yaml`
-- `99-worker-timezone.yaml`
-
-#### helper
-- `make-registry-mc.sh`
-
-### Typical use
-
-개별 적용:
-
-```bash
-oc apply -f mc_init/<file>.yaml
+```text
+install/00-vars/
 ```
 
-전체 적용:
+Main files:
 
-```bash
-oc apply -f mc_init/
-```
-
-registry MC 생성:
-
-```bash
-bash mc_init/make-registry-mc.sh
-```
-
-변수 지정 예시:
-
-```bash
-HOST=bastion CLUSTER=ocp DOMAIN=example.com OUTDIR=./out bash mc_init/make-registry-mc.sh
-```
+| file | purpose |
+|------|---------|
+| `cluster.env` | cluster identity and naming |
+| `network.env` | PXE / VIP / DHCP / DNS / network values |
+| `registry.env` | local registry settings |
+| `bastion.env` | bastion user / shell settings |
+| `install-config.env` | install-config and install flow settings |
+| `post.env` | post-install cluster configuration |
 
 ---
 
-## 4. install/01-pre
+## PXE / Bootstrap Design
 
-배스천 또는 설치 준비 단계에서 사용하는 스크립트입니다.
+### Addressing policy
 
-### `00-make-certs.sh`
-사설 인증서 생성 및 로컬 trust anchor 반영.
+- API / DNS / NTP use VIP
+- HTTP / TFTP / PXE source uses bastion1 real IP
 
-주요 기능:
-- `HOST`, `CLUSTER`, `DOMAIN` 기반 인증서 생성
-- SAN 반영
-- `/etc/pki/ca-trust/source/anchors` 배포
-- `update-ca-trust extract` 실행
+### Boot protocol policy
 
-### `01-registry.sh`
-사설 registry 컨테이너 구성.
+- PXELINUX kernel/initramfs → TFTP
+- GRUB kernel/initramfs → relative filename
+- rootfs → HTTP
+- ignition → HTTP
 
-주요 기능:
-- registry tar 로드
-- 다중 registry 컨테이너 실행
-- cert/key 배포
-- podman systemd unit 생성
-- health check 수행
+### Generated config naming
 
-기본 registry 정의:
-- `infra_registry` → `5000`
-- `cnf_registry` → `5001`
+Per-MAC files are generated as:
 
-### `02-openshift-admin-user.sh`
-htpasswd 기반 OpenShift admin 사용자 생성.
+```text
+pxelinux.cfg/01-xx-xx-xx-xx-xx-xx
+grub.cfg-01-xx-xx-xx-xx-xx-xx
+```
 
-주요 기능:
-- htpasswd 파일 생성
-- secret 생성/갱신
-- OAuth identity provider 반영
-- `cluster-admin` 권한 부여
-
-### `03-bastion-account.sh`
-배스천 계정 및 로그인 편의 설정.
-
-주요 기능:
-- root 비밀번호 설정
-- root SSH 로그인 비활성화
-- 추가 사용자 생성
-- sudoers NOPASSWD 설정
-- `/usr/local/bin` PATH 반영
-- bastion 호스트에서만 동작하는 `oc login` 자동화 블록 추가
-
-### `04-command-extract.sh`
-설치 tarball에서 주요 바이너리 추출.
-
-대상:
-- `helm`
-- `oc`
-- `kubectl`
-- `openshift-install`
-
-설치 위치:
-- `/usr/local/bin`
-
-### `05-bastion-chrony.sh`
-배스천 chrony 설정.
-
-주요 기능:
-- chrony.conf 백업
-- 지정 NTP 서버/allow 대역 반영
-- 설정 검증
-- 서비스 재시작
-- `chronyc sources`, `chronyc tracking` 확인
+MAC addresses are normalized to lowercase and `:` is converted to `-`.
 
 ---
 
-## 5. install/02-okd-install
+## install-config.yaml Policy
 
-### `install/02-okd-install/script.sh`
+The install-config is generated from `install/templates/install-config.yaml.tmpl`.
 
-OKD UPI 성격의 배스천 구성 및 설치 작업을 한 스크립트에 모아둔 파일입니다.
+Current design:
 
-포함 기능 범위:
+- `platform: none`
+- `networkType: OVNKubernetes`
+- explicit `additionalTrustBundle`
+- explicit `imageContentSources`
+- no `apiVIPs`
+- no `ingressVIPs`
 
-- `/etc/hosts` 생성
-- local repo 설정
-- ISO mount 설정
-- 필수 패키지 설치
-- daemon enable/disable 정리
-- SELinux / firewalld 조정
-- DNS(named) 구성
-- HAProxy 구성
-- TFTP 구성
-- PXE BIOS/UEFI grub/pxelinux menu 생성
-- VLAN 기반 PXE 옵션 구성
-- DHCP 구성
-- keepalived 구성
-- wildcard 인증서 생성
-- 로컬 registry 구성
-- `oc`, `openshift-install` 추출
-- SSH key 생성
-- `install-config.yaml` 생성
-- pull-secret 파일 생성
-- manifest / ignition 생성
-- ignition HTTP 배포
-- kubeconfig 복사
-- oc bash completion 설정
-
-### Notes
-
-이 스크립트는 현재도 하드코딩 값이 적지 않습니다.
-
-예:
-- `HOST='bastion'`
-- `CLUSTER='lgu'`
-- `DOMAIN='okd'`
-- PXE / bastion / VIP 대역
-- CoreOS 이미지 파일명
-- 인터페이스명 (`ens3`, `ens3.300`, `bond0.300`)
-- registry/pull-secret 관련 값
-
-따라서 범용 설치 프레임워크라기보다 특정 환경용 설치 자동화 스크립트에 가깝습니다.
+`install-config.yaml` is always backed up before regeneration.
 
 ---
 
-## 6. install/03-post
+## DNS Policy
 
-설치 완료 후 공통 후처리 스크립트입니다.
+- Forward zone only
+- Reverse zone is not used
+- `named.conf` is fully managed by the script for this install environment
 
-### `06-ingress-master.sh`
-IngressController를 master 노드에 배치.
+---
 
-주요 기능:
-- replica 수 조정
-- master nodeSelector 적용
-- master toleration 적용
+## HAProxy Policy
 
-### `07-whereabouts-reconciler.sh`
-whereabouts reconciler ConfigMap 및 additionalNetwork 추가.
+- API / MCS backends → master nodes
+- Ingress backends → worker / infra nodes
 
-주요 기능:
-- `whereabouts-config` ConfigMap 생성/갱신
-- `networks.operator.openshift.io/cluster`에 `additionalNetworks` 추가
+---
 
-### `08-userWorkloadMonitoring.sh`
-user workload monitoring 활성화 및 관련 컴포넌트 master 배치 설정.
+## keepalived Policy
 
-주요 기능:
-- `cluster-monitoring-config`에 `enableUserWorkload: true`
-- `user-workload-monitoring-config` 생성/갱신
-- Prometheus/Operator/ThanosRuler nodeSelector/toleration 설정
-
-### `09-routingViaHost.sh`
-OVN-Kubernetes gateway 설정 패치.
-
-주요 기능:
-- `routingViaHost` 반영
-- `ipForwarding` 반영
-
-### `10-enableCatalogSources.sh`
-OperatorHub default source enable/disable 제어.
-
-주요 기능:
-- `disableAllDefaultSources` 설정
-- `redhat-operators`
-- `community-operators`
-- `certified-operators`
-- `redhat-marketplace`
-
-enable/disable 값 제어
+- keepalived runs only on bastion nodes
+- bastion HA is inventory-based
+- notify script is intentionally not used
 
 ---
 
 ## Requirements
 
-### Common
-- bash
-
-### backup
-- oc
-- jq
-
-### image
-- podman
-- skopeo
-
-### mc_init
-- oc
-- MachineConfig 적용 권한
-
-### install/01-pre
-- root 권한
-- podman / systemctl / openssl / update-ca-trust / chrony 계열 명령
-- 일부 스크립트는 OpenShift 로그인 상태 필요
-
-### install/02-okd-install
-- root 권한
-- RHEL 계열 환경
-- DNS/HAProxy/TFTP/DHCP/HTTP/keepalived/podman 설치 가능 환경
-- PXE 및 로컬 registry 구성 가능한 네트워크 환경
-- `hosts.txt`, `mc/*.yaml`, 설치 tarball, CoreOS 이미지 등 외부 입력 파일 필요
-
-### install/03-post
-- oc 로그인 상태
-- cluster-admin 수준 권한 권장
+- root access
+- RHEL-like bastion host
+- `openshift-install`
+- `oc`
+- SSH public key
+- pull secret
+- additional trust bundle file
+- FCOS kernel / initramfs / rootfs artifacts
+- working PXE / HTTP / registry environment
 
 ---
 
-## Recommended flow
+## Usage Example
 
-예시 흐름:
+```bash
+cd install
 
-1. `install/01-pre/00-make-certs.sh`
-2. `install/01-pre/01-registry.sh`
-3. `install/01-pre/04-command-extract.sh`
-4. 필요 시 `mc_init/` 리소스 준비
-5. `install/02-okd-install/script.sh` 기반 배스천/설치 구성
-6. 클러스터 설치 완료 후 `install/03-post/` 순차 적용
+# 1. prepare variables and inventory
+vi 00-vars/*.env
+vi 00-inventory/hosts.txt
+
+# 2. bastion / infra setup
+bash run.sh pre
+
+# 3. cluster creation
+bash run.sh install
+
+# 4. login with kubeconfig after cluster is reachable
+export KUBECONFIG=/root/openshift-install/auth/kubeconfig
+oc login ...
+
+# 5. cluster post configuration
+bash run.sh post
+```
 
 ---
 
-## Caution
+## Other Directories
 
-- 일부 스크립트에는 기본 계정/비밀번호가 하드코딩되어 있습니다.
-- 일부 스크립트는 특정 도메인, 인터페이스명, 네트워크 대역을 전제로 합니다.
-- 운영 반영 전 환경 변수화 및 민감정보 분리를 먼저 하는 것이 좋습니다.
-- `install/02-okd-install/script.sh`는 범용화 전 검토가 필요합니다.
+### `backup/`
+
+Cluster resource backup scripts.
+
+- `growin_ocp_backup.sh`
+- `growin_ocp_backup_v0.2.sh`
+
+### `image/`
+
+Parallel image mirroring script.
+
+- `mirror-images.sh`
+
+### `mc_init/`
+
+MachineConfig-based node initialization resources and helpers.
+
+---
+
+## Notes
+
+- `run.sh` intentionally supports only `pre`, `install`, `post`
+- `all` mode is intentionally not used
+- post stage must be executed only after cluster API is reachable
+- TFTP setup is required before DHCP / PXE flow
+- publish step must complete before nodes attempt bootstrap
+
+---
+
+## TODO
+
+- registry mirror validation
+- additional precheck script
+- install/post health verification
+- README expansion with network diagrams
