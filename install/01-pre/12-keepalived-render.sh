@@ -8,108 +8,138 @@ INVENTORY_FILE="${INSTALL_DIR}/00-inventory/hosts.txt"
 
 # shellcheck disable=SC1091
 source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/cluster.env"
 load_env_file "${INSTALL_DIR}/00-vars/network.env"
 
 KEEPALIVED_TEMPLATE="${TEMPLATE_DIR}/keepalived.conf.tmpl"
 KEEPALIVED_DEST="${KEEPALIVED_DEST:-/etc/keepalived/keepalived.conf}"
 KEEPALIVED_SERVICE="${KEEPALIVED_SERVICE:-keepalived}"
 
-LOCAL_HOSTNAME="${LOCAL_HOSTNAME:-$(hostname -s)}"
-KEEPALIVED_INTERFACE="${KEEPALIVED_INTERFACE:-${NIC_NAME}}"
-KEEPALIVED_VRID="${KEEPALIVED_VRID:-51}"
-KEEPALIVED_AUTH_PASS="${KEEPALIVED_AUTH_PASS:-changeme123}"
-KEEPALIVED_PRIORITY_MASTER="${KEEPALIVED_PRIORITY_MASTER:-150}"
-KEEPALIVED_PRIORITY_BACKUP="${KEEPALIVED_PRIORITY_BACKUP:-100}"
+VRRP_INSTANCE_NAME="${VRRP_INSTANCE_NAME:-OCP}"
+VRRP_INTERFACE="${VRRP_INTERFACE:-${NIC_NAME}${VLAN_ID:+.${VLAN_ID}}}"
+VRRP_VIRTUAL_ROUTER_ID="${VRRP_VIRTUAL_ROUTER_ID:-100}"
+VRRP_PRIORITY_PRIMARY="${VRRP_PRIORITY_PRIMARY:-200}"
+VRRP_PRIORITY_SECONDARY="${VRRP_PRIORITY_SECONDARY:-100}"
+VRRP_ADVERT_INT="${VRRP_ADVERT_INT:-5}"
+VRRP_AUTH_TYPE="${VRRP_AUTH_TYPE:-PASS}"
+VRRP_AUTH_PASS="${VRRP_AUTH_PASS:-changeme}"
+VRRP_VIP="${VRRP_VIP:-${SERVICE_VIP}}"
 
-get_bastion_count() {
+get_bastion_nodes() {
   awk '
     BEGIN { FS="[[:space:]]+" }
     /^[[:space:]]*#/ { next }
-    NF < 9 { next }
-    $2 == "bastion" { count++ }
-    END { print count+0 }
+    NF < 3 { next }
+    $2 == "bastion" {
+      print $1 "|" $3
+    }
   ' "${INVENTORY_FILE}"
 }
 
 get_local_ip() {
-  awk -v local_host="${LOCAL_HOSTNAME}" '
-    BEGIN { FS="[[:space:]]+" }
-    /^[[:space:]]*#/ { next }
-    NF < 9 { next }
-    $1 == local_host && $2 == "bastion" { print $3; exit }
-  ' "${INVENTORY_FILE}"
+  ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1
 }
 
-get_unicast_peers() {
-  awk -v local_host="${LOCAL_HOSTNAME}" '
-    BEGIN { FS="[[:space:]]+" }
-    /^[[:space:]]*#/ { next }
-    NF < 9 { next }
-    $2 == "bastion" && $1 != local_host { print "    " $3 }
-  ' "${INVENTORY_FILE}"
+select_local_bastion() {
+  local local_ips
+  local bastion_line
+  local name ip
+
+  local_ips="$(get_local_ip || true)"
+
+  while IFS= read -r bastion_line; do
+    [[ -n "${bastion_line}" ]] || continue
+    IFS='|' read -r name ip <<< "${bastion_line}"
+    if printf '%s\n' "${local_ips}" | grep -qx "${ip}"; then
+      echo "${name}|${ip}"
+      return 0
+    fi
+  done < <(get_bastion_nodes)
+
+  return 1
 }
 
-detect_state_and_priority() {
-  local first_bastion
-  first_bastion="$(awk '
-    BEGIN { FS="[[:space:]]+" }
-    /^[[:space:]]*#/ { next }
-    NF < 9 { next }
-    $2 == "bastion" { print $1; exit }
-  ' "${INVENTORY_FILE}")"
+render_keepalived_conf() {
+  local state="$1"
+  local priority="$2"
+  local unicast_src_ip="$3"
+  local unicast_peers_block="$4"
 
-  if [[ "${LOCAL_HOSTNAME}" == "${first_bastion}" ]]; then
-    KEEPALIVED_STATE="MASTER"
-    KEEPALIVED_PRIORITY="${KEEPALIVED_PRIORITY_MASTER}"
-  else
-    KEEPALIVED_STATE="BACKUP"
-    KEEPALIVED_PRIORITY="${KEEPALIVED_PRIORITY_BACKUP}"
-  fi
+  sed \
+    -e "s|@@VRRP_INSTANCE_NAME@@|${VRRP_INSTANCE_NAME}|g" \
+    -e "s|@@VRRP_INTERFACE@@|${VRRP_INTERFACE}|g" \
+    -e "s|@@VRRP_STATE@@|${state}|g" \
+    -e "s|@@VRRP_PRIORITY@@|${priority}|g" \
+    -e "s|@@VRRP_VIRTUAL_ROUTER_ID@@|${VRRP_VIRTUAL_ROUTER_ID}|g" \
+    -e "s|@@VRRP_ADVERT_INT@@|${VRRP_ADVERT_INT}|g" \
+    -e "s|@@VRRP_AUTH_TYPE@@|${VRRP_AUTH_TYPE}|g" \
+    -e "s|@@VRRP_AUTH_PASS@@|${VRRP_AUTH_PASS}|g" \
+    -e "s|@@VRRP_VIP@@|${VRRP_VIP}|g" \
+    -e "s|@@UNICAST_SRC_IP@@|${unicast_src_ip}|g" \
+    -e "/@@UNICAST_PEERS@@/{
+      s|@@UNICAST_PEERS@@|${unicast_peers_block//$'\n'/\\n}|
+    }" \
+    "${KEEPALIVED_TEMPLATE}"
 }
 
 main() {
   require_root
-  require_cmd keepalived
+  require_cmd awk
+  require_cmd ip
   require_cmd systemctl
+  require_cmd keepalived
 
   [[ -f "${KEEPALIVED_TEMPLATE}" ]] || die "template not found: ${KEEPALIVED_TEMPLATE}"
   [[ -f "${INVENTORY_FILE}" ]] || die "inventory file not found: ${INVENTORY_FILE}"
 
-  local bastion_count
-  bastion_count="$(get_bastion_count)"
-  [[ "${bastion_count}" -ge 2 ]] || die "at least two bastion nodes are required"
+  local bastion_lines bastion_count
+  bastion_lines="$(get_bastion_nodes || true)"
+  bastion_count="$(printf '%s\n' "${bastion_lines}" | sed '/^$/d' | wc -l | awk '{print $1}')"
 
-  local local_ip
-  local_ip="$(get_local_ip)"
-  [[ -n "${local_ip}" ]] || die "local bastion IP not found for ${LOCAL_HOSTNAME}"
+  if [[ "${bastion_count}" -lt 2 ]]; then
+    log "single bastion detected, skipping keepalived configuration"
+    exit 0
+  fi
 
-  detect_state_and_priority
+  local local_bastion local_name local_ip
+  local_bastion="$(select_local_bastion || true)"
+  [[ -n "${local_bastion}" ]] || die "this host is not listed as a bastion node in ${INVENTORY_FILE}"
 
-  local unicast_peers
-  unicast_peers="$(get_unicast_peers)"
-  [[ -n "${unicast_peers}" ]] || die "failed to build unicast peers"
+  IFS='|' read -r local_name local_ip <<< "${local_bastion}"
+
+  local first_bastion first_name first_ip
+  first_bastion="$(printf '%s\n' "${bastion_lines}" | sed '/^$/d' | head -n1)"
+  IFS='|' read -r first_name first_ip <<< "${first_bastion}"
+
+  local state priority
+  if [[ "${local_name}" == "${first_name}" ]]; then
+    state="MASTER"
+    priority="${VRRP_PRIORITY_PRIMARY}"
+  else
+    state="BACKUP"
+    priority="${VRRP_PRIORITY_SECONDARY}"
+  fi
+
+  local peer_block=""
+  local line name ipaddr
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] || continue
+    IFS='|' read -r name ipaddr <<< "${line}"
+    [[ "${ipaddr}" == "${local_ip}" ]] && continue
+    peer_block="${peer_block}    ${ipaddr}"$'\n'
+  done < <(printf '%s\n' "${bastion_lines}")
+
+  [[ -n "${peer_block}" ]] || die "no peer bastion nodes found for keepalived"
 
   backup_file "${KEEPALIVED_DEST}"
-
-  sed \
-    -e "s|@@INTERFACE@@|${KEEPALIVED_INTERFACE}|g" \
-    -e "s|@@STATE@@|${KEEPALIVED_STATE}|g" \
-    -e "s|@@PRIORITY@@|${KEEPALIVED_PRIORITY}|g" \
-    -e "s|@@VRID@@|${KEEPALIVED_VRID}|g" \
-    -e "s|@@AUTH_PASS@@|${KEEPALIVED_AUTH_PASS}|g" \
-    -e "s|@@LOCAL_IP@@|${local_ip}|g" \
-    -e "s|@@SERVICE_VIP@@|${SERVICE_VIP}|g" \
-    -e "s|@@INGRESS_VIP@@|${INGRESS_VIP}|g" \
-    -e "/@@UNICAST_PEERS@@/{
-      s|@@UNICAST_PEERS@@|${unicast_peers//$'\n'/\\n}|
-    }" \
-    "${KEEPALIVED_TEMPLATE}" > "${KEEPALIVED_DEST}"
+  render_keepalived_conf "${state}" "${priority}" "${local_ip}" "${peer_block}" > "${KEEPALIVED_DEST}"
 
   keepalived -t -f "${KEEPALIVED_DEST}"
   systemctl enable --now "${KEEPALIVED_SERVICE}"
   systemctl restart "${KEEPALIVED_SERVICE}"
 
   log "updated ${KEEPALIVED_DEST}"
+  sed -n '1,220p' "${KEEPALIVED_DEST}"
 }
 
 main "$@"

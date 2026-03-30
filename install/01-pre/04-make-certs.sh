@@ -7,6 +7,7 @@ INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${INSTALL_DIR}/lib/common.sh"
 load_env_file "${INSTALL_DIR}/00-vars/cluster.env"
+load_env_file "${INSTALL_DIR}/00-vars/registry.env"
 
 CERT_DIR="${CERT_DIR:-./certs}"
 CERT_KEY="${CERT_DIR}/domain.key"
@@ -22,10 +23,9 @@ CERT_LOCALITY="${CERT_LOCALITY:-Seoul}"
 CERT_ORG="${CERT_ORG:-ORG}"
 CERT_ORG_UNIT="${CERT_ORG_UNIT:-NW}"
 
-NAME="${CLUSTER}.${DOMAIN}"
+NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
 CERT_CN="${CERT_CN:-${HOST}.${NAME}}"
 SAN_LIST_CSV="${SAN_LIST_CSV:-DNS:*.${NAME},DNS:${HOST}.${NAME}}"
-
 
 build_san_string() {
   local san_string=""
@@ -66,6 +66,10 @@ main() {
   require_root
   require_cmd openssl
   require_cmd update-ca-trust
+
+  [[ -n "${CLUSTER_NAME}" ]] || die "CLUSTER_NAME is required"
+  [[ -n "${BASE_DOMAIN}" ]] || die "BASE_DOMAIN is required"
+  [[ -n "${HOST}" ]] || die "HOST is required"
 
   ensure_dir "${CERT_DIR}"
   handle_existing_cert

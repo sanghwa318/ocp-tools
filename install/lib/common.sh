@@ -57,8 +57,10 @@ load_env_file() {
   local env_file="$1"
   [[ -f "${env_file}" ]] || die "env file not found: ${env_file}"
 
+  set -a
   # shellcheck disable=SC1090
-  source ${env_file}"
+  source "${env_file}"
+  set +a
 }
 
 bool_normalize() {

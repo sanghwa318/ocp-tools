@@ -17,6 +17,12 @@ load_env_file "${VARS_DIR}/post.env"
 
 MODE="${1:-}"
 
+ensure_install_workdir_is_clean() {
+  if [[ -e "${INSTALL_WORKDIR}" ]]; then
+    die "install workdir already exists: ${INSTALL_WORKDIR}"
+  fi
+}
+
 run_pre() {
   print_section "RUN PRE"
   bash "${SCRIPT_DIR}/01-pre/00-command-extract.sh"
@@ -40,7 +46,7 @@ run_install() {
   bash "${SCRIPT_DIR}/02-install/01-manifests-generate.sh"
   bash "${SCRIPT_DIR}/02-install/02-ignition-generate.sh"
   bash "${SCRIPT_DIR}/02-install/03-publish-artifacts.sh"
-  bash "${SCRIPT_DIR}/02-install/04-create-cluster.sh"
+#  bash "${SCRIPT_DIR}/02-install/04-create-cluster.sh"
 }
 
 run_post() {

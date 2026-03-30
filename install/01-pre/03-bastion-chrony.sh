@@ -38,10 +38,8 @@ write_chrony_conf() {
       echo
     fi
 
-    if [[ -n "${ALLOW_NETWORKS}" ]]; then
-      echo "allow ${ALLOW_NETWORKS}"
-      echo
-    fi
+    echo "allow ${ALLOW_NETWORKS}"
+    echo
 
     if [[ "${SERVE_LOCAL_TIME}" == "yes" ]]; then
       echo "local stratum ${LOCAL_STRATUM}"
@@ -71,6 +69,7 @@ main() {
   require_cmd systemctl
 
   [[ -n "${NTP_SERVERS}" ]] || die "NTP_SERVERS is required"
+  [[ -n "${ALLOW_NETWORKS}" ]] || die "ALLOW_NETWORKS is required"
 
   ensure_dir "${LOGDIR}"
   backup_file "${CHRONY_CONF}"

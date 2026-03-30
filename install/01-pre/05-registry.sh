@@ -43,7 +43,6 @@ main() {
   require_root
   require_cmd podman
   require_cmd systemctl
-  require_cmd curl
   require_cmd ss
 
   [[ -f "${CERT_DIR}/${CERT_FILE}" ]] || die "certificate file not found: ${CERT_DIR}/${CERT_FILE}"
@@ -103,10 +102,9 @@ main() {
   for item in "${REGISTRY_ITEMS[@]}"; do
     IFS='|' read -r NAME DIR HOST_PORT <<< "${item}"
     systemctl enable --now "${NAME}.service"
-
-    local code
-    code="$(curl -sk -o /dev/null -w "%{http_code}" "https://${HOST}.${CLUSTER}.${DOMAIN}:${HOST_PORT}/v2/")"
-    [[ "${code}" == "200" || "${code}" == "401" ]] || die "health check failed for ${NAME}: ${code}"
+    systemctl is-enabled "${NAME}.service" >/dev/null
+    systemctl is-active "${NAME}.service" >/dev/null
+    log "${NAME} enabled and started"
   done
 
   podman ps

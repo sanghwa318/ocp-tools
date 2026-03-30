@@ -2,20 +2,23 @@ default-lease-time 600;
 max-lease-time 7200;
 ddns-update-style none;
 authoritative;
+option routers @@GATEWAY@@;
+option domain-name-servers @@DNS_SERVER@@;
 
 option architecture-type code 93 = unsigned integer 16;
 
 subnet @@SUBNET@@ netmask @@NETMASK@@ {
+pool {
   range @@DHCP_RANGE_START@@ @@DHCP_RANGE_END@@;
-  option routers @@GATEWAY@@;
-  option domain-name-servers @@DNS_SERVER@@;
-  next-server @@PXE_NEXT_SERVER@@;
+@@HOST_RESERVATIONS@@
+
+  deny all clients;
 
   if option architecture-type = 00:07 {
     filename "@@PXE_UEFI_BOOTFILE@@";
   } else {
     filename "@@PXE_BIOS_BOOTFILE@@";
   }
+  next-server @@PXE_NEXT_SERVER@@;
 }
-
-@@HOST_RESERVATIONS@@
+}

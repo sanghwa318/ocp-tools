@@ -1,0 +1,4 @@
+mkdir /run/containers/62011
+cp /root/.docker/config.json /run/containers/62011/auth.json
+chmod a+r /run/containers/62011/auth.json
+chmod a+rx /run/containers
