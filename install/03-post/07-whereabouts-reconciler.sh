@@ -1,32 +1,21 @@
-# 07-whereabouts-reconciler.sh
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-MULTUS_NAMESPACE='openshift-multus'
-CONFIGMAP_NAME='whereabouts-config'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+
+MULTUS_NAMESPACE="${MULTUS_NAMESPACE:-openshift-multus}"
+CONFIGMAP_NAME="${CONFIGMAP_NAME:-whereabouts-config}"
 RECONCILER_CRON_EXPRESSION="${RECONCILER_CRON_EXPRESSION:-*/5 * * * *}"
 
-NETWORK_CR_NAME='cluster'
+NETWORK_CR_NAME="${NETWORK_CR_NAME:-cluster}"
 ADDITIONAL_NETWORK_NAME="${ADDITIONAL_NETWORK_NAME:-whereabouts-shim}"
 ADDITIONAL_NETWORK_NAMESPACE="${ADDITIONAL_NETWORK_NAMESPACE:-default}"
 ADDITIONAL_NETWORK_CNI_VERSION="${ADDITIONAL_NETWORK_CNI_VERSION:-0.3.1}"
 ADDITIONAL_NETWORK_TYPE="${ADDITIONAL_NETWORK_TYPE:-bridge}"
-
-log() {
-  echo "[INFO] $*"
-}
-
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { err "command not found: $1"; exit 1; }
-}
-
-check_oc() {
-  oc whoami >/dev/null 2>&1 || { err "oc is not logged in"; exit 1; }
-}
 
 ensure_configmap() {
   log "applying configmap ${CONFIGMAP_NAME}"
@@ -77,8 +66,7 @@ verify() {
 }
 
 main() {
-  require_cmd oc
-  check_oc
+  require_oc_login
   ensure_configmap
   ensure_additional_network
   verify

@@ -1,0 +1,9 @@
+# hostname role ip gateway nic mac nettype vlan_id install_dev
+bastion1 bastion 192.168.200.10 192.168.200.1 ens3 52:54:00:aa:bb:01 ethernet - /dev/vda
+bastion2 bastion 192.168.200.11 192.168.200.1 ens3 52:54:00:aa:bb:02 ethernet - /dev/vda
+bootstrap bootstrap 192.168.200.41 192.168.200.1 ens3 52:54:00:aa:bb:41 ethernet - /dev/vda
+master1 master 192.168.200.21 192.168.200.1 ens3 52:54:00:aa:bb:21 vlan 300 /dev/vda
+master2 master 192.168.200.22 192.168.200.1 ens3 52:54:00:aa:bb:22 vlan 300 /dev/vda
+master3 master 192.168.200.23 192.168.200.1 ens3 52:54:00:aa:bb:23 vlan 300 /dev/vda
+worker1 worker 192.168.200.31 192.168.200.1 ens3,ens4 52:54:00:aa:bb:31 bond - /dev/sda
+worker2 worker 192.168.200.32 192.168.200.1 ens3,ens4 52:54:00:aa:bb:32 bond - /dev/sda

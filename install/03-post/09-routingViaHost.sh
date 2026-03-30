@@ -1,30 +1,19 @@
-# 09-routing-via-host.sh
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-NETWORK_CR_NAME='cluster'
-ROUTING_VIA_HOST="${ROUTING_VIA_HOST:-true}"
-IP_FORWARDING_MODE="${IP_FORWARDING_MODE:-Global}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-log() {
-  echo "[INFO] $*"
-}
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/post.env"
 
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { err "command not found: $1"; exit 1; }
-}
-
-check_oc() {
-  oc whoami >/dev/null 2>&1 || { err "oc is not logged in"; exit 1; }
-}
+NETWORK_CR_NAME="${NETWORK_CR_NAME:-cluster}"
 
 main() {
-  require_cmd oc
-  check_oc
+  require_oc_login
+
+  resource_exists "network.operator.openshift.io" "${NETWORK_CR_NAME}" || die "network CR not found: ${NETWORK_CR_NAME}"
 
   log "patching network.operator.openshift.io/${NETWORK_CR_NAME}"
   oc patch network.operator.openshift.io/"${NETWORK_CR_NAME}" \

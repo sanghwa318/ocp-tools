@@ -1,0 +1,35 @@
+apiVersion: v1
+baseDomain: @@BASE_DOMAIN@@
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  replicas: @@COMPUTE_REPLICAS@@
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  replicas: @@CONTROL_PLANE_REPLICAS@@
+metadata:
+  name: @@CLUSTER_NAME@@
+networking:
+  clusterNetwork:
+  - cidr: @@CLUSTER_NETWORK_CIDR@@
+    hostPrefix: @@CLUSTER_NETWORK_HOST_PREFIX@@
+  networkType: @@NETWORK_TYPE@@
+  serviceNetwork:
+  - @@SERVICE_NETWORK_CIDR@@
+platform:
+  @@INSTALL_PLATFORM@@: {}
+pullSecret: '@@PULL_SECRET@@'
+sshKey: '@@SSH_PUBKEY@@'
+additionalTrustBundle: |
+@@ADDITIONAL_TRUST_BUNDLE@@
+
+imageContentSources:
+- mirrors:
+  - @@IMAGE_MIRROR_HOST@@/@@IMAGE_MIRROR_PATH@@
+  source: @@IMAGE_SOURCE_RELEASE@@
+- mirrors:
+  - @@IMAGE_MIRROR_HOST@@/@@IMAGE_MIRROR_PATH@@
+  source: @@IMAGE_SOURCE_CONTENT@@

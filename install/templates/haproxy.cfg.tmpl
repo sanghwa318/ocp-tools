@@ -1,0 +1,42 @@
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    daemon
+    maxconn 20000
+
+defaults
+    log global
+    mode tcp
+    option dontlognull
+    timeout connect 10s
+    timeout client  1m
+    timeout server  1m
+    maxconn 20000
+
+frontend api_frontend
+    bind @@API_VIP@@:6443
+    default_backend api_backend
+
+backend api_backend
+@@API_BACKENDS@@
+
+frontend mcs_frontend
+    bind @@API_VIP@@:22623
+    default_backend mcs_backend
+
+backend mcs_backend
+@@MCS_BACKENDS@@
+
+frontend ingress_http_frontend
+    bind @@INGRESS_VIP@@:80
+    default_backend ingress_http_backend
+
+backend ingress_http_backend
+@@INGRESS_HTTP_BACKENDS@@
+
+frontend ingress_https_frontend
+    bind @@INGRESS_VIP@@:443
+    default_backend ingress_https_backend
+
+backend ingress_https_backend
+@@INGRESS_HTTPS_BACKENDS@@

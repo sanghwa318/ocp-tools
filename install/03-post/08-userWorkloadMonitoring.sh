@@ -1,33 +1,20 @@
-# 08-user-workload-monitoring.sh
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-CLUSTER_MON_NS='openshift-monitoring'
-CLUSTER_MON_CM='cluster-monitoring-config'
-USER_WORKLOAD_NS='openshift-user-workload-monitoring'
-USER_WORKLOAD_CM='user-workload-monitoring-config'
-TARGET_NODE_ROLE_KEY="${TARGET_NODE_ROLE_KEY:-node-role.kubernetes.io/master}"
-TARGET_TOLERATION_KEY="${TARGET_TOLERATION_KEY:-node-role.kubernetes.io/master}"
-TARGET_TOLERATION_EFFECT="${TARGET_TOLERATION_EFFECT:-NoSchedule}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/post.env"
+
+CLUSTER_MON_NS="${CLUSTER_MON_NS:-openshift-monitoring}"
+CLUSTER_MON_CM="${CLUSTER_MON_CM:-cluster-monitoring-config}"
+USER_WORKLOAD_NS="${USER_WORKLOAD_NS:-openshift-user-workload-monitoring}"
+USER_WORKLOAD_CM="${USER_WORKLOAD_CM:-user-workload-monitoring-config}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
-
-log() {
-  echo "[INFO] $*"
-}
-
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { err "command not found: $1"; exit 1; }
-}
-
-check_oc() {
-  oc whoami >/dev/null 2>&1 || { err "oc is not logged in"; exit 1; }
-}
 
 apply_cluster_monitoring_config() {
   log "enabling user workload monitoring"
@@ -88,8 +75,7 @@ verify() {
 }
 
 main() {
-  require_cmd oc
-  check_oc
+  require_oc_login
   apply_cluster_monitoring_config
   apply_user_workload_config
   verify

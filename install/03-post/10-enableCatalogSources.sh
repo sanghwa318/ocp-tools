@@ -1,40 +1,23 @@
-# 10-enable-catalog-sources.sh
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-DISABLE_ALL_DEFAULT_SOURCES="${DISABLE_ALL_DEFAULT_SOURCES:-true}"
-ENABLE_REDHAT_OPERATORS="${ENABLE_REDHAT_OPERATORS:-true}"
-ENABLE_COMMUNITY_OPERATORS="${ENABLE_COMMUNITY_OPERATORS:-true}"
-ENABLE_CERTIFIED_OPERATORS="${ENABLE_CERTIFIED_OPERATORS:-false}"
-ENABLE_MARKETPLACE_OPERATORS="${ENABLE_MARKETPLACE_OPERATORS:-false}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-log() {
-  echo "[INFO] $*"
-}
-
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { err "command not found: $1"; exit 1; }
-}
-
-check_oc() {
-  oc whoami >/dev/null 2>&1 || { err "oc is not logged in"; exit 1; }
-}
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/post.env"
 
 bool_to_disabled() {
   case "$1" in
     true) echo "false" ;;
     false) echo "true" ;;
-    *) err "invalid boolean: $1"; exit 1 ;;
+    *) die "invalid boolean: $1" ;;
   esac
 }
 
 main() {
-  require_cmd oc
-  check_oc
+  require_oc_login
 
   local redhat_disabled
   local community_disabled
