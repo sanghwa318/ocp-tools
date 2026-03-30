@@ -1,49 +1,90 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ===== 변수 =====
-USER_NAME="admin"
-USER_PASSWORD="telco1234"
-HTPASSWD_FILE="./htpasswd"
-SECRET_NAME="htpasswd-secret"
-OAUTH_NAME="cluster"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# ===== 사전 체크 =====
-command -v oc >/dev/null || { echo "oc CLI not found"; exit 1; }
-command -v htpasswd >/dev/null || { echo "htpasswd not found (install httpd-tools)"; exit 1; }
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/cluster.env"
 
-echo "[1/6] htpasswd 파일 생성 또는 갱신"
-htpasswd -bBc "${HTPASSWD_FILE}" "${USER_NAME}" "${USER_PASSWORD}"
+USER_NAME="${USER_NAME:-admin}"
+USER_PASSWORD="${USER_PASSWORD:-}"
+HTPASSWD_FILE="${HTPASSWD_FILE:-./htpasswd}"
+SECRET_NAME="${SECRET_NAME:-htpasswd-secret}"
+OAUTH_NAME="${OAUTH_NAME:-cluster}"
+IDP_NAME="${IDP_NAME:-htpasswd}"
 
-echo "[2/6] OpenShift secret 생성/갱신"
-oc create secret generic "${SECRET_NAME}" \
-	  --from-file=htpasswd="${HTPASSWD_FILE}" \
-	    -n openshift-config \
-	      --dry-run=client -o yaml | oc apply -f -
+ensure_required_values() {
+  [[ -n "${USER_NAME}" ]] || die "USER_NAME is required"
+  [[ -n "${USER_PASSWORD}" ]] || die "USER_PASSWORD is required"
+}
 
-echo "[3/6] OAuth 설정에 htpasswd provider 반영"
-cat <<EOF | oc apply -f -
+ensure_tools() {
+  require_cmd oc
+  require_cmd htpasswd
+  require_oc_login
+}
+
+create_or_update_htpasswd_file() {
+  log "creating or updating htpasswd file"
+  htpasswd -bBc "${HTPASSWD_FILE}" "${USER_NAME}" "${USER_PASSWORD}"
+}
+
+apply_secret() {
+  log "applying secret ${SECRET_NAME}"
+  oc create secret generic "${SECRET_NAME}" \
+    --from-file=htpasswd="${HTPASSWD_FILE}" \
+    -n openshift-config \
+    --dry-run=client -o yaml | oc apply -f -
+}
+
+apply_oauth_idp() {
+  log "applying OAuth identity provider"
+
+  cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: OAuth
 metadata:
   name: ${OAUTH_NAME}
 spec:
   identityProviders:
-  - name: htpasswd
+  - name: ${IDP_NAME}
     mappingMethod: claim
     type: HTPasswd
     htpasswd:
       fileData:
         name: ${SECRET_NAME}
 EOF
+}
 
-echo "[4/6] OAuth 적용 대기"
-sleep 10
+grant_cluster_admin() {
+  log "granting cluster-admin to ${USER_NAME}"
+  oc adm policy add-cluster-role-to-user cluster-admin "${USER_NAME}"
+}
 
-echo "[5/6] cluster-admin 권한 부여"
-oc adm policy add-cluster-role-to-user cluster-admin "${USER_NAME}"
+verify() {
+  log "verifying secret ${SECRET_NAME}"
+  oc get secret "${SECRET_NAME}" -n openshift-config >/dev/null
 
-echo "[6/6] 완료"
-echo "User: ${USER_NAME}"
-echo "Password: ${USER_PASSWORD}"
+  log "verifying OAuth ${OAUTH_NAME}"
+  oc get oauth "${OAUTH_NAME}" -o jsonpath='{.spec.identityProviders[*].name}{"\n"}' | grep -qw "${IDP_NAME}"
 
+  log "verifying cluster-admin binding for ${USER_NAME}"
+  oc adm policy who-can '*' '*' >/dev/null 2>&1 || true
+}
+
+main() {
+  ensure_tools
+  ensure_required_values
+  create_or_update_htpasswd_file
+  apply_secret
+  apply_oauth_idp
+  grant_cluster_admin
+  verify
+
+  log "done"
+  echo "User: ${USER_NAME}"
+}
+
+main "$@"

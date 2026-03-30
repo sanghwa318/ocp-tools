@@ -1,34 +1,30 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_PASSWORD='telco1234'
-DISABLE_ROOT_SSH='yes'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-CREATE_EXTRA_USER='yes'
-EXTRA_USER_NAME='core'
-EXTRA_USER_PASSWORD='telco1234'
-EXTRA_USER_GROUPS='wheel'
-EXTRA_USER_SUDO_NOPASSWD='yes'
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/bastion.env"
+load_env_file "${INSTALL_DIR}/00-vars/cluster.env"
 
-ENABLE_OC_AUTO_LOGIN='yes'
-OC_LOGIN_USER='admin'
-OC_LOGIN_PASSWORD='telco1234'
-OC_LOGIN_SERVER='https://api.lgu.okd:6443'
-BASTION_HOST_PATTERN='bastion'
+SSHD_INCLUDE_DIR="${SSHD_INCLUDE_DIR:-/etc/ssh/sshd_config.d}"
+SSHD_GROWIN_CONF="${SSHD_GROWIN_CONF:-${SSHD_INCLUDE_DIR}/99-growin.conf}"
 
-log() {
-  echo "[INFO] $*"
-}
-
-err() {
-  echo "[ERROR] $*" >&2
+ensure_required_values() {
+  [[ -n "${ROOT_PASSWORD}" ]] || die "ROOT_PASSWORD is required"
+  if [[ "${CREATE_EXTRA_USER}" == "yes" ]]; then
+    [[ -n "${EXTRA_USER_NAME}" ]] || die "EXTRA_USER_NAME is required"
+    [[ -n "${EXTRA_USER_PASSWORD}" ]] || die "EXTRA_USER_PASSWORD is required"
+  fi
 }
 
 set_password() {
   local user="$1"
   local password="$2"
 
-  echo "${password}" | passwd --stdin "${user}" >/dev/null
+  echo "${user}:${password}" | chpasswd
 }
 
 ensure_user_exists() {
@@ -53,34 +49,62 @@ ensure_sudoers_nopasswd() {
   local user="$1"
   local sudoers_file="/etc/sudoers.d/${user}"
 
-  if [[ "${EXTRA_USER_SUDO_NOPASSWD}" != "yes" ]]; then
-    return 0
-  fi
+  [[ "${EXTRA_USER_SUDO_NOPASSWD}" == "yes" ]] || return 0
 
   echo "${user} ALL=(ALL) NOPASSWD: ALL" > "${sudoers_file}"
   chmod 0440 "${sudoers_file}"
 
-  if ! visudo -cf "${sudoers_file}" >/dev/null 2>&1; then
-    err "invalid sudoers file: ${sudoers_file}"
-    exit 1
-  fi
+  require_cmd visudo
+  visudo -cf "${sudoers_file}" >/dev/null 2>&1 || die "invalid sudoers file: ${sudoers_file}"
 
   log "sudoers configured for ${user}"
 }
 
-disable_root_ssh_login() {
-  if [[ "${DISABLE_ROOT_SSH}" != "yes" ]]; then
+configure_root_ssh_policy() {
+  ensure_dir "${SSHD_INCLUDE_DIR}"
+
+  if [[ "${DISABLE_ROOT_SSH}" == "yes" ]]; then
+    cat > "${SSHD_GROWIN_CONF}" <<EOF
+PermitRootLogin no
+EOF
+  else
+    cat > "${SSHD_GROWIN_CONF}" <<EOF
+PermitRootLogin yes
+EOF
+  fi
+
+  sshd_validate
+  systemctl restart sshd
+  log "sshd policy updated"
+}
+
+append_usr_local_bin_block() {
+  local target_user="$1"
+  local home_dir="$2"
+  local bashrc="${home_dir}/.bashrc"
+
+  [[ -d "${home_dir}" ]] || return 0
+  touch "${bashrc}"
+
+  if grep -q 'BEGIN_ADD_USR_LOCAL_BIN' "${bashrc}" 2>/dev/null; then
+    log "${bashrc} already contains /usr/local/bin block"
     return 0
   fi
 
-  if grep -qE '^[#[:space:]]*PermitRootLogin[[:space:]]+' /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*PermitRootLogin[[:space:]].*/PermitRootLogin no/' /etc/ssh/sshd_config
-  else
-    echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
-  fi
+  cat <<'EOF' >> "${bashrc}"
+# BEGIN_ADD_USR_LOCAL_BIN
+case ":$PATH:" in
+  *:/usr/local/bin:*)
+    ;;
+  *)
+    export PATH="$PATH:/usr/local/bin"
+    ;;
+esac
+# END_ADD_USR_LOCAL_BIN
+EOF
 
-  systemctl restart sshd
-  log "root ssh login disabled"
+  chown "${target_user}:${target_user}" "${bashrc}" 2>/dev/null || true
+  log "/usr/local/bin block appended to ${bashrc}"
 }
 
 append_oc_login_block() {
@@ -108,7 +132,7 @@ esac
 if command -v oc >/dev/null 2>&1; then
   if hostname | grep -q '${BASTION_HOST_PATTERN}' ; then
     if ! oc whoami >/dev/null 2>&1; then
-      if [ -n "${OC_LOGIN_SERVER}" ]; then
+      if [ -n "${OC_LOGIN_SERVER}" ] && [ -n "${OC_LOGIN_USER}" ] && [ -n "${OC_LOGIN_PASSWORD}" ]; then
         oc login --server "${OC_LOGIN_SERVER}" --insecure-skip-tls-verify=true -u "${OC_LOGIN_USER}" -p '${OC_LOGIN_PASSWORD}' >/dev/null 2>&1
       fi
     fi
@@ -122,10 +146,8 @@ EOF
 }
 
 configure_root() {
-  log "setting root password"
+  log "configuring root"
   set_password root "${ROOT_PASSWORD}"
-
-  disable_root_ssh_login
   append_usr_local_bin_block root /root
   append_oc_login_block root /root
 }
@@ -143,40 +165,16 @@ configure_extra_user() {
   append_oc_login_block "${EXTRA_USER_NAME}" "/home/${EXTRA_USER_NAME}"
 }
 
-append_usr_local_bin_block() {
-  local target_user="$1"
-  local home_dir="$2"
-  local bashrc="${home_dir}/.bashrc"
-
-  [[ -d "${home_dir}" ]] || return 0
-
-  touch "${bashrc}"
-
-  if grep -q 'BEGIN_ADD_USR_LOCAL_BIN' "${bashrc}" 2>/dev/null; then
-    log "${bashrc} already contains /usr/local/bin block"
-    return 0
-  fi
-
-  cat <<'EOF' >> "${bashrc}"
-# BEGIN_ADD_USR_LOCAL_BIN
-case ":$PATH:" in
-  *:/usr/local/bin:*)
-    ;;
-  *)
-    export PATH="$PATH:/usr/local/bin"
-    ;;
-esac
-# END_ADD_USR_LOCAL_BIN
-EOF
-
-  chown "${target_user}:${target_user}" "${bashrc}" 2>/dev/null || true
-  log "/usr/local/bin block appended to ${bashrc}"
-}
-
 main() {
+  require_root
+  require_cmd systemctl
+  require_cmd sshd
+  require_cmd chpasswd
+
+  ensure_required_values
   configure_root
   configure_extra_user
+  configure_root_ssh_policy
 }
 
 main "$@"
-

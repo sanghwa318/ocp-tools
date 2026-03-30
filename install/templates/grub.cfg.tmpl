@@ -1,0 +1,12 @@
+menuentry '@@HOSTNAME@@ (@@ROLE@@)' {
+    linuxefi @@FCOS_KERNEL_URL@@ \
+      ip=@@IP@@::@@GATEWAY@@:255.255.255.0:@@HOSTNAME@@:@@NIC@@:none \
+      nameserver=@@NAMESERVER@@ \
+      rd.neednet=1 \
+      coreos.inst=yes \
+      coreos.inst.install_dev=/dev/sda \
+      coreos.inst.image_url=@@FCOS_ROOTFS_URL@@ \
+      coreos.inst.ignition_url=@@IGNITION_URL@@
+
+    initrdefi @@FCOS_INITRAMFS_URL@@
+}

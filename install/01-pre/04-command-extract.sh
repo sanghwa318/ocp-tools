@@ -1,10 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-DEST_DIR='/usr/local/bin'
-
-# Default: use the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+
+DEST_DIR="${DEST_DIR:-/usr/local/bin}"
 TAR_DIR="${TAR_DIR:-${SCRIPT_DIR}}"
 
 INSTALL_TARGETS=(
@@ -14,64 +17,54 @@ INSTALL_TARGETS=(
   "openshift-install-linux-*.tar.gz:openshift-install:openshift-install"
 )
 
-log() {
-  echo "[INFO] $*"
-}
-
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_root() {
-  if [[ "${EUID}" -ne 0 ]]; then
-    err "run as root"
-    exit 1
-  fi
-}
-
-# Find tar file in TAR_DIR using pattern
 find_tar_file() {
   local pattern="$1"
   local tar_file
 
-  tar_file="$(find "${TAR_DIR}" -maxdepth 1 -type f -name "${pattern}" | sort | head -n1 || true)"
-
-  if [[ -z "${tar_file}" ]]; then
-    err "tar file not found in ${TAR_DIR} for pattern: ${pattern}"
-    exit 1
-  fi
+  tar_file="$(find "${TAR_DIR}" -maxdepth 1 -type f -name "${pattern}" | sort | tail -n1 || true)"
+  [[ -n "${tar_file}" ]] || die "tar file not found in ${TAR_DIR} for pattern: ${pattern}"
 
   echo "${tar_file}"
 }
 
-# Extract a specific file from tar and install to DEST_DIR
 install_from_tar() {
   local tar_file="$1"
   local member_path="$2"
   local bin_name="$3"
 
-  if ! tar tf "${tar_file}" | grep -qx "${member_path}"; then
-    err "member not found in ${tar_file}: ${member_path}"
-    exit 1
-  fi
+  tar tf "${tar_file}" | grep -qx "${member_path}" || die "member not found in ${tar_file}: ${member_path}"
 
   log "installing ${bin_name} from ${tar_file}"
   tar xf "${tar_file}" -O "${member_path}" > "${DEST_DIR}/${bin_name}"
   chmod 0755 "${DEST_DIR}/${bin_name}"
 }
 
+verify_installed_binaries() {
+  [[ -x "${DEST_DIR}/helm" ]] || die "helm not installed"
+  [[ -x "${DEST_DIR}/oc" ]] || die "oc not installed"
+  [[ -x "${DEST_DIR}/kubectl" ]] || die "kubectl not installed"
+  [[ -x "${DEST_DIR}/openshift-install" ]] || die "openshift-install not installed"
+
+  "${DEST_DIR}/helm" version --short >/dev/null 2>&1 || true
+  "${DEST_DIR}/oc" version --client >/dev/null 2>&1 || true
+  "${DEST_DIR}/kubectl" version --client >/dev/null 2>&1 || true
+  "${DEST_DIR}/openshift-install" version >/dev/null 2>&1 || true
+}
+
 main() {
   require_root
-  mkdir -p "${DEST_DIR}"
+  require_cmd tar
 
-  log "tar directory: ${TAR_DIR}"
+  ensure_dir "${DEST_DIR}"
 
+  local target tar_pattern member_path bin_name tar_file
   for target in "${INSTALL_TARGETS[@]}"; do
     IFS=':' read -r tar_pattern member_path bin_name <<< "${target}"
-
-    TAR_FILE="$(find_tar_file "${tar_pattern}")"
-    install_from_tar "${TAR_FILE}" "${member_path}" "${bin_name}"
+    tar_file="$(find_tar_file "${tar_pattern}")"
+    install_from_tar "${tar_file}" "${member_path}" "${bin_name}"
   done
+
+  verify_installed_binaries
 
   log "installed files"
   ls -l \

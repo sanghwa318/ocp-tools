@@ -1,0 +1,26 @@
+global_defs {
+    router_id LVS_DEVEL
+}
+
+vrrp_instance VI_1 {
+    state @@STATE@@
+    interface @@INTERFACE@@
+    virtual_router_id @@VRID@@
+    priority @@PRIORITY@@
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass @@AUTH_PASS@@
+    }
+
+    unicast_src_ip @@LOCAL_IP@@
+    unicast_peer {
+@@UNICAST_PEERS@@
+    }
+
+    virtual_ipaddress {
+        @@SERVICE_VIP@@
+        @@INGRESS_VIP@@
+    }
+}

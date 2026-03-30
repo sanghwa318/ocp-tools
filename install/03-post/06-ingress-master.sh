@@ -1,33 +1,18 @@
-# 06-ingress-master.sh
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-NAMESPACE='openshift-ingress-operator'
-INGRESS_NAME='default'
-INGRESS_REPLICAS="${INGRESS_REPLICAS:-3}"
-TARGET_NODE_ROLE_KEY="${TARGET_NODE_ROLE_KEY:-node-role.kubernetes.io/master}"
-TARGET_TOLERATION_KEY="${TARGET_TOLERATION_KEY:-node-role.kubernetes.io/master}"
-TARGET_TOLERATION_EFFECT="${TARGET_TOLERATION_EFFECT:-NoSchedule}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-log() {
-  echo "[INFO] $*"
-}
+# shellcheck disable=SC1091
+source "${INSTALL_DIR}/lib/common.sh"
+load_env_file "${INSTALL_DIR}/00-vars/post.env"
 
-err() {
-  echo "[ERROR] $*" >&2
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || { err "command not found: $1"; exit 1; }
-}
-
-check_oc() {
-  oc whoami >/dev/null 2>&1 || { err "oc is not logged in"; exit 1; }
-}
+NAMESPACE="${NAMESPACE:-openshift-ingress-operator}"
+INGRESS_NAME="${INGRESS_NAME:-default}"
 
 main() {
-  require_cmd oc
-  check_oc
+  require_oc_login
 
   log "patching ingresscontroller/${INGRESS_NAME}"
   oc patch ingresscontroller/"${INGRESS_NAME}" \
