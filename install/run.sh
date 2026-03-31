@@ -44,6 +44,7 @@ run_install() {
   print_section "RUN INSTALL"
   bash "${SCRIPT_DIR}/02-install/00-install-config-render.sh"
   bash "${SCRIPT_DIR}/02-install/01-manifests-generate.sh"
+  bash "${SCRIPT_DIR}/02-install/01a-mc-init-render.sh"
   bash "${SCRIPT_DIR}/02-install/02-ignition-generate.sh"
   bash "${SCRIPT_DIR}/02-install/03-publish-artifacts.sh"
 #  bash "${SCRIPT_DIR}/02-install/04-create-cluster.sh"
