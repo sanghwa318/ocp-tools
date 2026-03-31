@@ -756,30 +756,3 @@ bash run.sh post
 ```bash
 mount -o loop <iso> /media
 ```
-
----
-
-## `NS has no address records`
-원인:
-- `ns1` A record 없음
-
-조치:
-- zone 생성 시 `ns1 IN A <bastion-ip>` 보장
-
----
-
-## `cannot create the cluster because "none" is a UPI platform`
-원인:
-- UPI에서 `create cluster` 실행
-
-조치:
-- 해당 단계 제거
-
----
-
-## `install-config file not found` after manifests
-원인:
-- manifests 생성 시 install-config 복사본 소비
-
-조치:
-- ignition/create 단계에서 install-config 재검사 금지
