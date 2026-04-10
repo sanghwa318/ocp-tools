@@ -6,38 +6,53 @@ named에 bastion, bastion1 bastion2 등 추가 , hosts에 마찬가지로 shortn
 # 필수 변경해야하는 변수 (파일명 / 변수명) 
 
 bastion.env / ROOT_PASSWORD
+
 bastion.env / EXTRA_USER_PASSWORD
+
 bastion.env / OC_LOGIN_PASSWORD
+
 bastion.env / OC_LOGIN_SERVER
 
-
 cluster.env / HOST
+
 cluster.env / CLUSTER_NAME
+
 cluster.env / BASE_DOMAIN
 
-
 install-config.env / MC_INIT_ENABLE
+
 install-config.env / MC_INIT_COPY_TO_MANIFESTS
+
 install-config.env / MC_ENABLE_CHRONY=yes
+
 install-config.env / MC_ENABLE_REGISTRIES=yes
+
 install-config.env / MC_ENABLE_CORE_PASSWORD=yes
+
 install-config.env / MC_ENABLE_ROOT_PASSWORD=yes
+
 install-config.env / MC_ENABLE_THP=no
 
 install-config.env / MC_CORE_PASSWORD='telco1234'
+
 install-config.env / MC_ROOT_PASSWORD='telco1234'
 
 install-config.env / MC_THP_ISOLCPUS="${MC_THP_ISOLCPUS:-}"
+
 install-config.env / MC_THP_HUGEPAGESZ=1G
+
 install-config.env / MC_THP_HUGEPAGES=128
+
 install-config.env / MC_THP_DISABLE_TRANSPARENT_HUGEPAGE=no
 
-
-
 network.env / SERVICE_VIP
+
 network.env / INGRESS_VIP
+
 network.env / DNS_SERVER
+
 network.env / NTP_SERVERS
+
 network.env / ALLOW_NETWORKS
 이하 네트워크 관련 변수는 환경에맞춰 수정
 
