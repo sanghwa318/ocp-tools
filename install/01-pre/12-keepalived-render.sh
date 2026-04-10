@@ -16,7 +16,13 @@ KEEPALIVED_DEST="${KEEPALIVED_DEST:-/etc/keepalived/keepalived.conf}"
 KEEPALIVED_SERVICE="${KEEPALIVED_SERVICE:-keepalived}"
 
 VRRP_INSTANCE_NAME="${VRRP_INSTANCE_NAME:-OCP}"
-VRRP_INTERFACE="${VRRP_INTERFACE:-${NIC_NAME}${VLAN_ID:+.${VLAN_ID}}}"
+if [[ -n "${VRRP_INTERFACE:-}" ]]; then
+  :
+elif [[ "${NETTYPE:-ethernet}" == "vlan" && -n "${VLAN_ID:-}" && "${VLAN_ID}" != "-" ]]; then
+  VRRP_INTERFACE="${NIC_NAME}.${VLAN_ID}"
+else
+  VRRP_INTERFACE="${NIC_NAME}"
+fi
 VRRP_VIRTUAL_ROUTER_ID="${VRRP_VIRTUAL_ROUTER_ID:-100}"
 VRRP_PRIORITY_PRIMARY="${VRRP_PRIORITY_PRIMARY:-200}"
 VRRP_PRIORITY_SECONDARY="${VRRP_PRIORITY_SECONDARY:-100}"
@@ -82,6 +88,11 @@ render_keepalived_conf() {
     "${KEEPALIVED_TEMPLATE}"
 }
 
+get_interface_ipv4() {
+	  local iface="$1"
+	    ip -4 -o addr show dev "${iface}" scope global | awk '{print $4}' | cut -d/ -f1 | head -n1
+    }
+
 main() {
   require_root
   require_cmd awk
@@ -101,11 +112,20 @@ main() {
     exit 0
   fi
 
-  local local_bastion local_name local_ip
+#  local local_bastion local_name local_ip
+#  local_bastion="$(select_local_bastion || true)"
+#  [[ -n "${local_bastion}" ]] || die "this host is not listed as a bastion node in ${INVENTORY_FILE}"
+#
+#  IFS='|' read -r local_name local_ip <<< "${local_bastion}"
+  local local_bastion local_name inventory_ip local_ip
   local_bastion="$(select_local_bastion || true)"
   [[ -n "${local_bastion}" ]] || die "this host is not listed as a bastion node in ${INVENTORY_FILE}"
+   
+  IFS='|' read -r local_name inventory_ip <<< "${local_bastion}"
+   
+  local_ip="$(get_interface_ipv4 "${VRRP_INTERFACE}" || true)"
+  [[ -n "${local_ip}" ]] || die "no IPv4 address found on interface ${VRRP_INTERFACE}"
 
-  IFS='|' read -r local_name local_ip <<< "${local_bastion}"
 
   local first_bastion first_name first_ip
   first_bastion="$(printf '%s\n' "${bastion_lines}" | sed '/^$/d' | head -n1)"

@@ -38,6 +38,7 @@ run_pre() {
   bash "${SCRIPT_DIR}/01-pre/10-dhcp-render.sh"
   bash "${SCRIPT_DIR}/01-pre/11-pxe-grub-render.sh"
   bash "${SCRIPT_DIR}/01-pre/12-keepalived-render.sh"
+  bash "${SCRIPT_DIR}/01-pre/13-httpd.sh"
 }
 
 run_install() {
@@ -48,6 +49,8 @@ run_install() {
   bash "${SCRIPT_DIR}/02-install/02-ignition-generate.sh"
   bash "${SCRIPT_DIR}/02-install/03-publish-artifacts.sh"
 #  bash "${SCRIPT_DIR}/02-install/04-create-cluster.sh"
+  bash "${SCRIPT_DIR}/02-install/05-bootstrap-62011-cmd.sh"
+  bash "${SCRIPT_DIR}/02-install/06-kubeconfig.sh"
 }
 
 run_post() {

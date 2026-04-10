@@ -1,7 +1,27 @@
 # hostname role ip gateway nic mac nettype vlan_id install_dev
-bastion.test.okd bastion 100.230.0.235 100.230.0.1 ens3 52:54:00:21:f8:10 ethernet - /dev/vda
-bootstrap.test.okd bootstrap 100.230.0.237 100.230.0.1 ens3 52:54:00:61:ca:82 ethernet - /dev/vda
-master1.test.okd master 100.230.0.238 100.230.0.1 ens3 52:54:00:3f:32:db ethernet - /dev/vda
-master2.test.okd master 100.230.0.239 100.230.0.1 ens3 52:54:00:6d:e2:53 ethernet - /dev/vda
-master3.test.okd master 100.230.0.240 100.230.0.1 ens3 52:54:00:c7:f6:bb ethernet - /dev/vda
-worker1.test.okd worker 100.230.0.2 100.230.0.1 ens3f1,ens9f1 6c:83:75:bb:e0:a1 bond - /dev/vda
+# AMF 
+dj-tw-mano-cpm01-vm-bastion.lgu.dj-cpm01.co.kr	bastion 192.168.200.79	172.30.89.1 ens3 52:54:00:6F:23:8A ethernet - /dev/vda
+dj-tw-mano-cpm01-vm-bastion01.lgu.dj-cpm01.co.kr	bastion 192.168.200.80	172.30.89.1 ens3 52:54:00:6F:23:8A ethernet - /dev/vda
+dj-tw-mano-cpm01-vm-bastion02.lgu.dj-cpm01.co.kr	bastion 192.168.200.81 172.30.89.1 ens3 52:54:00:D1:4B:77 ethernet - /dev/vda
+dj-tw-mano-cpm01-vm-mst01.lgu.dj-cpm01.co.kr	master	192.168.200.83	192.168.200.1	ens3	52:54:00:B2:1C:4E	ethernet	-	/dev/vda
+dj-tw-mano-cpm01-vm-mst02.lgu.dj-cpm01.co.kr	master	192.168.200.84	192.168.200.1	ens3	52:54:00:8D:55:A7	ethernet	-	/dev/vda
+dj-tw-mano-cpm01-vm-mst03.lgu.dj-cpm01.co.kr	master	192.168.200.85	192.168.200.1	ens3	52:54:00:19:E3:6B	ethernet	-	/dev/vda
+dj-tw-mano-cpm01-vm-bootstrap.lgu.dj-cpm01.co.kr	bootstrap	192.168.200.82	192.168.200.1	ens3	52:54:00:3A:7F:91	ethernet	-	/dev/vda
+dj-ss-5sa-amf-saf01-pm-wk01.lgu.dj-cpm01.co.kr	worker	192.168.200.2	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D5:1D:40	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk02.lgu.dj-cpm01.co.kr	worker	192.168.200.3	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D4:97:B0	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk03.lgu.dj-cpm01.co.kr	worker	192.168.200.4	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D5:1D:B0	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk04.lgu.dj-cpm01.co.kr	worker	192.168.200.5	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D4:E5:70	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk05.lgu.dj-cpm01.co.kr	worker	192.168.200.6	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D5:1D:00	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk06.lgu.dj-cpm01.co.kr	worker	192.168.200.7	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:BC:B4:50	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk07.lgu.dj-cpm01.co.kr	worker	192.168.200.8	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D4:B4:B0	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk08.lgu.dj-cpm01.co.kr	worker	192.168.200.9	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D4:B5:00	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk09.lgu.dj-cpm01.co.kr	worker	192.168.200.10	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:D2:31:30	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk10.lgu.dj-cpm01.co.kr	worker	192.168.200.11	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:C4:3C	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk11.lgu.dj-cpm01.co.kr	worker	192.168.200.12	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:C2:FC	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk12.lgu.dj-cpm01.co.kr	worker	192.168.200.13	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:BE:0C	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk13.lgu.dj-cpm01.co.kr	worker	192.168.200.14	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:BE:B4	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk14.lgu.dj-cpm01.co.kr	worker	192.168.200.15	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:BD:48	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk15.lgu.dj-cpm01.co.kr	worker	192.168.200.16	192.168.200.1	ens2f1,ens3f1,ens5f1,ens6f1	44:49:88:06:C4:88	bond	-	/dev/sda
+dj-ss-5sa-amf-saf01-pm-wk16.lgu.dj-cpm01.co.kr	worker	192.168.200.17	192.168.200.1	ens2f0,ens3f0,ens5f0,ens6f0	48:DF:37:BB:9F:00	bond	-	/dev/sda
+dj-ss-5sa-amf-ems01-pm-wk01.lgu.dj-cpm01.co.kr	worker	192.168.200.66	192.168.200.1	ens1f0,ens4f0	48:DF:37:D4:A5:C0	bond	-	/dev/sda
+dj-ss-5sa-amf-ems01-pm-wk02.lgu.dj-cpm01.co.kr	worker	192.168.200.67	192.168.200.1	ens1f0,ens4f0	48:DF:37:D4:97:50	bond	-	/dev/sda

@@ -53,6 +53,7 @@ main() {
   tag="$(detect_registry_tag "${tar_file}")"
 
   podman load --input "${tar_file}"
+  sleep 3s
   podman image exists "${BASE_REGISTRY_IMAGE}:${tag}" || die "image not found after load"
 
   parse_registries

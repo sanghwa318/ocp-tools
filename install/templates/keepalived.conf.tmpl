@@ -3,24 +3,23 @@ global_defs {
 }
 
 vrrp_instance VI_1 {
-    state @@STATE@@
-    interface @@INTERFACE@@
-    virtual_router_id @@VRID@@
-    priority @@PRIORITY@@
-    advert_int 1
+    state @@VRRP_STATE@@
+    interface @@VRRP_INTERFACE@@
+    virtual_router_id @@VRRP_VIRTUAL_ROUTER_ID@@
+    priority @@VRRP_PRIORITY@@
+    advert_int @@VRRP_ADVERT_INT@@
 
     authentication {
-        auth_type PASS
-        auth_pass @@AUTH_PASS@@
+        auth_type @@VRRP_AUTH_TYPE@@
+        auth_pass @@VRRP_AUTH_PASS@@
     }
 
-    unicast_src_ip @@LOCAL_IP@@
+    unicast_src_ip @@UNICAST_SRC_IP@@
     unicast_peer {
 @@UNICAST_PEERS@@
     }
 
     virtual_ipaddress {
-        @@SERVICE_VIP@@
-        @@INGRESS_VIP@@
+        @@VRRP_VIP@@
     }
 }

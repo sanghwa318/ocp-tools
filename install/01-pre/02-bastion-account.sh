@@ -123,6 +123,9 @@ append_oc_login_block() {
   fi
 
   cat <<EOF >> "${bashrc}"
+# KUBECONFIG
+export KUBECONFIG=/$(echo ${BASE_DOMAIN} | cut -d '.' -f1)/auth/kubeconfig
+
 # BEGIN_OC_AUTO_LOGIN
 case \$- in
   *i*) ;;

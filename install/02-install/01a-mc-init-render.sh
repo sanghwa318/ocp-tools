@@ -16,8 +16,8 @@ MC_INIT_COPY_TO_MANIFESTS="${MC_INIT_COPY_TO_MANIFESTS:-no}"
 
 MC_ENABLE_CHRONY="${MC_ENABLE_CHRONY:-yes}"
 MC_ENABLE_REGISTRIES="${MC_ENABLE_REGISTRIES:-yes}"
-MC_ENABLE_CORE_PASSWORD="${MC_ENABLE_CORE_PASSWORD:-no}"
-MC_ENABLE_ROOT_PASSWORD="${MC_ENABLE_ROOT_PASSWORD:-no}"
+MC_ENABLE_CORE_PASSWORD="${MC_ENABLE_CORE_PASSWORD:-yes}"
+MC_ENABLE_ROOT_PASSWORD="${MC_ENABLE_ROOT_PASSWORD:-yes}"
 MC_ENABLE_THP="${MC_ENABLE_THP:-no}"
 
 MC_CORE_PASSWORD="${MC_CORE_PASSWORD:-growin}"
@@ -26,7 +26,7 @@ MC_ROOT_PASSWORD="${MC_ROOT_PASSWORD:-growin}"
 MC_THP_ISOLCPUS="${MC_THP_ISOLCPUS:-}"
 MC_THP_HUGEPAGESZ="${MC_THP_HUGEPAGESZ:-1G}"
 MC_THP_HUGEPAGES="${MC_THP_HUGEPAGES:-0}"
-MC_THP_DISABLE_TRANSPARENT_HUGEPAGE="${MC_THP_DISABLE_TRANSPARENT_HUGEPAGE:-yes}"
+MC_THP_DISABLE_TRANSPARENT_HUGEPAGE="${MC_THP_DISABLE_TRANSPARENT_HUGEPAGE:-no}"
 
 MC_INIT_RENDER_DIR="${MC_INIT_RENDER_DIR:-${INSTALL_WORKDIR}/mc_init_rendered}"
 MC_INIT_MANIFESTS_TARGET_DIR="${MC_INIT_MANIFESTS_TARGET_DIR:-${INSTALL_WORKDIR}/openshift}"
@@ -61,15 +61,12 @@ b64_noline() {
   base64 -w 0
 }
 
-urlencode_data_url() {
-  python3 -c 'import sys, urllib.parse; print("data:," + urllib.parse.quote(sys.stdin.read(), safe=""))'
-}
 
 render_master_chrony() {
-  local server_ip="$1"
-  local out="$2"
+	  local server_ip="$1"
+	    local out="$2"
 
-  cat > "${out}" <<EOF
+	      cat > "${out}" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -83,8 +80,7 @@ spec:
     storage:
       files:
         - contents:
-            compression: ""
-            source: $(cat <<EOC | urlencode_data_url
+            source: data:text/plain;charset=utf-8;base64,$(cat <<EOC | b64_noline
 server ${server_ip}
 driftfile /var/lib/chrony/drift
 makestep 1.0 3
@@ -99,10 +95,10 @@ EOF
 }
 
 render_worker_chrony() {
-  local server_ip="$1"
-  local out="$2"
+	  local server_ip="$1"
+	    local out="$2"
 
-  cat > "${out}" <<EOF
+	      cat > "${out}" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -116,8 +112,7 @@ spec:
     storage:
       files:
         - contents:
-            compression: ""
-            source: $(cat <<EOC | urlencode_data_url
+            source: data:text/plain;charset=utf-8;base64,$(cat <<EOC | b64_noline
 server ${server_ip}
 driftfile /var/lib/chrony/drift
 makestep 1.0 3
@@ -531,7 +526,6 @@ copy_to_manifests_if_enabled() {
 main() {
   require_root
   require_cmd openssl
-  require_cmd python3
   require_cmd base64
 
   if [[ "${MC_INIT_ENABLE}" != "yes" ]]; then
