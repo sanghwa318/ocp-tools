@@ -60,7 +60,7 @@ network.env / ALLOW_NETWORKS
 
 
 ## VM 생성명령어 (LGU 대전 작업 기준으로 작성됨)
-#AMF (cpm01)#
+### AMF (cpm01)
 virt-install   --name dj-tw-mano-cpm01-vm-bastion01   --vcpus 24   --memory 32768   --cpu host-passthrough   --disk path=/home/vmimg/bastion1.qcow2,format=qcow2,bus=virtio   --network bridge=br-k8s,model=virtio,mac=52:54:00:6F:23:8A  --network bridge=br-oam,model=virtio --network bridge=br-ilo,model=virtio --noautoconsole --import
 
 virt-install   --name dj-tw-mano-cpm01-vm-bastion02   --vcpus 24   --memory 32768   --cpu host-passthrough   --disk path=/home/vmimg/bastion2.qcow2,format=qcow2,bus=virtio   --network bridge=br-k8s,model=virtio,mac=52:54:00:D1:4B:77  --network bridge=br-oam,model=virtio --network bridge=br-ilo,model=virtio --noautoconsole --import
@@ -81,7 +81,7 @@ virt-install   --name dj-tw-mano-cpm01-vm-mst03  --vcpus 24   --memory 32768   -
 
 
 
-#SMF (cpm02)#
+### SMF (cpm02)
 virt-install   --name dj-tw-mano-cpm02-vm-bastion01   --vcpus 24   --memory 32768   --cpu host-passthrough   --disk path=/home/vmimg/bastion1.qcow2,format=qcow2,bus=virtio   --network bridge=br-k8s,model=virtio,mac=52:54:00:0C:9E:52 --network bridge=br-oam,model=virtio --noautoconsole --import
 
 virt-install   --name dj-tw-mano-cpm02-vm-bastion02   --vcpus 24   --memory 32768   --cpu host-passthrough   --disk path=/home/vmimg/bastion2.qcow2,format=qcow2,bus=virtio   --network bridge=br-k8s,model=virtio,mac=52:54:00:A8:35:1D --network bridge=br-oam,model=virtio --noautoconsole --import
