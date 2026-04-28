@@ -19,6 +19,7 @@ MC_ENABLE_REGISTRIES="${MC_ENABLE_REGISTRIES:-yes}"
 MC_ENABLE_CORE_PASSWORD="${MC_ENABLE_CORE_PASSWORD:-yes}"
 MC_ENABLE_ROOT_PASSWORD="${MC_ENABLE_ROOT_PASSWORD:-yes}"
 MC_ENABLE_THP="${MC_ENABLE_THP:-no}"
+MC_ENABLE_STATIC="${MC_ENABLE_STATIC:-yes}"
 
 MC_CORE_PASSWORD="${MC_CORE_PASSWORD:-growin}"
 MC_ROOT_PASSWORD="${MC_ROOT_PASSWORD:-growin}"
@@ -30,6 +31,19 @@ MC_THP_DISABLE_TRANSPARENT_HUGEPAGE="${MC_THP_DISABLE_TRANSPARENT_HUGEPAGE:-no}"
 
 MC_INIT_RENDER_DIR="${MC_INIT_RENDER_DIR:-${INSTALL_WORKDIR}/mc_init_rendered}"
 MC_INIT_MANIFESTS_TARGET_DIR="${MC_INIT_MANIFESTS_TARGET_DIR:-${INSTALL_WORKDIR}/openshift}"
+MC_INIT_STATIC_SRC_DIR="${MC_INIT_STATIC_SRC_DIR:-${INSTALL_DIR}/../mc_init}"
+
+# static MC 파일 목록 (렌더링 없이 단순 복사 대상)
+MC_STATIC_FILES=(
+  99-master-iscsi-scan-add.yaml
+  99-worker-iscsi-scan-add.yaml
+  99-master-multipath.yaml
+  99-worker-multipath.yaml
+  99-master-ssh-enable-password-login.yaml
+  99-worker-ssh-enable-password-login.yaml
+  99-master-timezone.yaml
+  99-worker-timezone.yaml
+)
 
 get_bastion_count() {
   awk '
@@ -514,6 +528,30 @@ spec:
 EOF
 }
 
+copy_static_mc_if_enabled() {
+  if [[ "${MC_ENABLE_STATIC}" != "yes" ]]; then
+    log "MC_ENABLE_STATIC=${MC_ENABLE_STATIC}, skip copy static mc files"
+    return
+  fi
+
+  local static_src
+  static_src="$(cd "${MC_INIT_STATIC_SRC_DIR}" && pwd)"
+
+  local copied=0
+  for fname in "${MC_STATIC_FILES[@]}"; do
+    local src="${static_src}/${fname}"
+    if [[ -f "${src}" ]]; then
+      cp -f "${src}" "${MC_INIT_RENDER_DIR}/${fname}"
+      log "copied static mc: ${fname}"
+      (( copied++ )) || true
+    else
+      log "WARN: static mc file not found, skipping: ${src}"
+    fi
+  done
+
+  log "static mc copy done: ${copied}/${#MC_STATIC_FILES[@]} files"
+}
+
 copy_to_manifests_if_enabled() {
   if [[ "${MC_INIT_COPY_TO_MANIFESTS}" == "yes" ]]; then
     find "${MC_INIT_RENDER_DIR}" -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -exec cp -f {} "${MC_INIT_MANIFESTS_TARGET_DIR}/" \;
@@ -564,6 +602,8 @@ main() {
   if [[ "${MC_ENABLE_THP}" == "yes" ]]; then
     render_worker_thp "${MC_INIT_RENDER_DIR}/99-worker-thp.yaml"
   fi
+
+  copy_static_mc_if_enabled
 
   copy_to_manifests_if_enabled
 
